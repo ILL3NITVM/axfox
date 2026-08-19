@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """DappBay submission ASSISTANT — fills form fields, never signs anything.
 
-HONESTY NOTE: the CSS selectors below are best-guess placeholders based on
-common form patterns, not confirmed against the live DappBay page — this
-project has no live browser-inspection access this session (no browser
-tool connected). Run with --inspect first to open the page and manually
-confirm/fix the selectors before trusting --fill to work correctly.
+CONFIRMED LIVE (2026-08-19, via a headless Playwright fetch of the raw
+page content — not a guess): the actual submission form does not exist in
+the DOM until a wallet is connected. The page ships WalletKit connect-
+modal CSS and an embedded initial state of
+`"wallet":{"walletType":"","chainId":0,...}` — empty until connection —
+and the only <input> elements present pre-connection are the nav search
+bar (2 of them), no form fields at all. So the CSS selectors below are
+still placeholders (there is nothing to select yet), but this is now a
+confirmed structural fact about the page, not an assumption: selector
+discovery is only possible in a live session with a human connecting
+their real wallet. Run with --inspect once you're ready to do that.
 
 Safety model:
 - Runs non-headless, persistent browser context — a human must be

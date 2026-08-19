@@ -1,7 +1,16 @@
-# AxolotlFox (AXFOX)
+# AxolotlFox — AXFOX 🦎🦊
 
-🦎🦊 Half axolotl. Half fox. A meme/community token on BNB Smart Chain,
+Half axolotl. Half fox. A community meme token on **BNB Smart Chain**,
 launched through [Four.meme](https://four.meme).
+
+**Token contract:**
+`0x3ABFBDf7a12Cb7589a330A293e91380f84A94444`
+
+**Creator public wallet:**
+`0x203f3D9E101a8A2ADb4c49652eFB1240174a5569`
+
+**No guaranteed returns.** This is an early-stage, speculative meme token.
+Nothing here is investment advice.
 
 ## Token
 
@@ -11,6 +20,7 @@ launched through [Four.meme](https://four.meme).
 | Ticker | AXFOX |
 | Network | BNB Smart Chain (chain id 56) |
 | Contract | `0x3ABFBDf7a12Cb7589a330A293e91380f84A94444` |
+| Creator wallet (public) | `0x203f3D9E101a8A2ADb4c49652eFB1240174a5569` |
 | Launched via | Four.meme (bonding curve) |
 
 **Verify the contract yourself** on [BscScan](https://bscscan.com/token/0x3ABFBDf7a12Cb7589a330A293e91380f84A94444)

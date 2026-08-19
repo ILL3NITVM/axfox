@@ -9,6 +9,7 @@ UNAVAILABLE.
 from __future__ import annotations
 
 import html
+import os
 import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -25,11 +26,12 @@ from app.notify import telegram  # noqa: E402
 
 PORT = 8091
 CONTRACT = config.CONTRACT_ADDRESS
+LOGO_PATH = Path(__file__).resolve().parents[1] / "public" / "assets" / "AXFOX_160x160.png"
 
 SOCIAL = {
     "github": "https://github.com/ILL3NITVM/axfox",
-    "x": None,  # HUMAN_ACTION_REQUIRED — never fabricate an account
-    "telegram": None,  # HUMAN_ACTION_REQUIRED
+    "x": os.environ.get("AXFOX_X_URL") or None,  # HUMAN_ACTION_REQUIRED if unset — never fabricated
+    "telegram": os.environ.get("AXFOX_TELEGRAM_URL") or None,  # HUMAN_ACTION_REQUIRED if unset
     "fourmeme": f"https://four.meme/en/token/{CONTRACT}",
     "bscscan": f"https://bscscan.com/token/{CONTRACT}",
 }
@@ -58,6 +60,10 @@ def render() -> str:
         else:
             social_rows += f'<li>{esc(label.upper())}: UNAVAILABLE (not configured)</li>'
 
+    mascot_html = (
+        '<img src="/logo.png" alt="AXFOX logo">' if LOGO_PATH.exists() else "🦎🦊"
+    )
+
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -83,12 +89,13 @@ def render() -> str:
   a {{ color:var(--accent); }}
   .risk {{ font-size:13px; color:var(--muted); border-left:3px solid #5a3a1a; padding:10px 14px; background:#1a140c; border-radius:0 8px 8px 0; }}
   .mascot {{ font-size:48px; }}
+  .mascot img {{ width:80px; height:80px; border-radius:16px; display:block; }}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="mascot">🦎🦊</div>
-  <h1>AxolotlFox (AXFOX)</h1>
+  <div class="mascot">{mascot_html}</div>
+  <h1>AxolotlFox (AXFOX) 🦎🦊</h1>
   <p class="sub">Half axolotl. Half fox. A meme/community token on BNB Smart Chain, launched via Four.meme.</p>
 
   <div class="panel">
@@ -142,7 +149,7 @@ def render() -> str:
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path not in ("/", "/index.html", "/health"):
+        if self.path not in ("/", "/index.html", "/health", "/logo.png"):
             self.send_response(404)
             self.end_headers()
             self.wfile.write(b"not found")
@@ -152,6 +159,19 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/plain")
             self.end_headers()
             self.wfile.write(b"ok")
+            return
+        if self.path == "/logo.png":
+            if not LOGO_PATH.exists():
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"logo not configured yet")
+                return
+            data = LOGO_PATH.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
             return
         try:
             body = render().encode()
