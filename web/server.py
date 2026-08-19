@@ -128,22 +128,7 @@ def render() -> str:
     </div>
     <label>Latest message signature</label>
     <pre id="signature-output">none</pre>
-
-    <h2 style="margin-top:20px">Human-reviewed transaction signer</h2>
-    <p class="wallet-note">This tool never fills a destination, amount, or calldata for you. Review all three. “Send” asks your wallet to sign and broadcast on BNB Smart Chain.</p>
-    <label for="tx-to">Destination contract/address</label>
-    <input id="tx-to" autocomplete="off" spellcheck="false" placeholder="0x…">
-    <label for="tx-value">BNB value</label>
-    <input id="tx-value" inputmode="decimal" autocomplete="off" placeholder="0">
-    <label for="tx-data">Transaction data / calldata</label>
-    <textarea id="tx-data" autocomplete="off" spellcheck="false" placeholder="0x"></textarea>
-    <div class="actions"><button id="tx-prepare" type="button">Prepare & preview</button></div>
-    <label>Exact transaction preview</label>
-    <pre id="tx-preview">nothing prepared</pre>
-    <label for="tx-confirm">After review, type SEND</label>
-    <input id="tx-confirm" autocomplete="off" spellcheck="false" placeholder="SEND">
-    <div class="actions"><button id="tx-send" type="button">Request wallet signature & broadcast</button></div>
-    <div class="row"><span>Transaction result</span><span id="tx-result" class="v">none</span></div>
+    <p class="wallet-note">Reloading the page clears the displayed signature above. That's expected — the signature was never stored anywhere, not a signing failure.</p>
   </div>
 
   <div class="panel">
@@ -167,6 +152,25 @@ def render() -> str:
     <h2>Links</h2>
     <ul>{social_rows}</ul>
   </div>
+
+  <details class="panel">
+    <summary style="cursor:pointer; font-size:14px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);">Advanced transaction tools</summary>
+    <h2 style="margin-top:16px">Human-reviewed transaction signer</h2>
+    <p class="wallet-note">This tool never fills a destination, amount, or calldata for you. Review all three. “Send” asks your wallet to sign and broadcast on BNB Smart Chain.</p>
+    <label for="tx-to">Destination contract/address</label>
+    <input id="tx-to" autocomplete="off" spellcheck="false" placeholder="0x…">
+    <label for="tx-value">BNB value</label>
+    <input id="tx-value" inputmode="decimal" autocomplete="off" placeholder="0">
+    <label for="tx-data">Transaction data / calldata</label>
+    <textarea id="tx-data" autocomplete="off" spellcheck="false" placeholder="0x"></textarea>
+    <div class="actions"><button id="tx-prepare" type="button">Prepare & preview</button></div>
+    <label>Exact transaction preview</label>
+    <pre id="tx-preview">nothing prepared</pre>
+    <label for="tx-confirm">After review, type SEND</label>
+    <input id="tx-confirm" autocomplete="off" spellcheck="false" placeholder="SEND">
+    <div class="actions"><button id="tx-send" type="button">Request wallet signature & broadcast</button></div>
+    <div class="row"><span>Transaction result</span><span id="tx-result" class="v">none</span></div>
+  </details>
 
   <div class="panel">
     <h2>System status</h2>
