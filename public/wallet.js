@@ -150,10 +150,25 @@
     $('tx-confirm').value = '';
   }
 
+  async function readTokenDecimals() {
+    const eth = provider();
+    // ERC-20 decimals() selector = 0x313ce567. Read from the token itself instead
+    // of hard-coding token metadata into the wallet request.
+    const raw = await eth.request({
+      method: 'eth_call',
+      params: [{ to: AXFOX_TOKEN, data: '0x313ce567' }, 'latest'],
+    });
+    if (!/^0x[0-9a-fA-F]+$/.test(raw || '')) throw new Error('Could not read AXFOX decimals from chain.');
+    const decimals = Number(BigInt(raw));
+    if (!Number.isInteger(decimals) || decimals < 0 || decimals > 255) throw new Error('AXFOX decimals response was invalid.');
+    return decimals;
+  }
+
   async function watchAxfox() {
     const eth = provider();
     if (!eth) throw new Error('No compatible wallet detected.');
     await ensureBsc();
+    const decimals = await readTokenDecimals();
     const ok = await eth.request({
       method: 'wallet_watchAsset',
       params: {
@@ -161,7 +176,7 @@
         options: {
           address: AXFOX_TOKEN,
           symbol: 'AXFOX',
-          decimals: 18,
+          decimals,
           image: `${location.origin}/logo.png`,
         },
       },
