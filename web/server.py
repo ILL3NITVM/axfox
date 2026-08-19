@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""AXFOX public dashboard — read-only, stdlib-only HTTP server.
+"""AXFOX public dashboard + client-side wallet signing surface.
 
-Renders live data from the axfox-swarm chain store + Four.meme status
-module on every request. No wallet interaction, no writes, no fake
-statistics anywhere — every field that isn't actually known says
-UNAVAILABLE.
+Server remains read-only. Wallet access and signing happen only in the
+visitor's own EIP-1193 wallet in the browser; no private key is ever sent
+to this process.
 """
 from __future__ import annotations
 
@@ -26,20 +25,20 @@ from app.notify import telegram  # noqa: E402
 
 PORT = 8091
 CONTRACT = config.CONTRACT_ADDRESS
-LOGO_PATH = Path(__file__).resolve().parents[1] / "public" / "assets" / "AXFOX_160x160.png"
+PUBLIC_DIR = Path(__file__).resolve().parents[1] / "public"
+LOGO_PATH = PUBLIC_DIR / "assets" / "AXFOX_160x160.png"
+WALLET_JS_PATH = PUBLIC_DIR / "wallet.js"
 
 SOCIAL = {
     "github": "https://github.com/ILL3NITVM/axfox",
-    "x": os.environ.get("AXFOX_X_URL") or None,  # HUMAN_ACTION_REQUIRED if unset — never fabricated
-    "telegram": os.environ.get("AXFOX_TELEGRAM_URL") or None,  # HUMAN_ACTION_REQUIRED if unset
+    "x": os.environ.get("AXFOX_X_URL") or None,
+    "telegram": os.environ.get("AXFOX_TELEGRAM_URL") or None,
     "fourmeme": f"https://four.meme/en/token/{CONTRACT}",
     "bscscan": f"https://bscscan.com/token/{CONTRACT}",
 }
 
-
 def esc(v) -> str:
     return html.escape(str(v))
-
 
 def render() -> str:
     store = HolderStore()
@@ -60,18 +59,17 @@ def render() -> str:
         else:
             social_rows += f'<li>{esc(label.upper())}: UNAVAILABLE (not configured)</li>'
 
-    mascot_html = (
-        '<img src="/logo.png" alt="AXFOX logo">' if LOGO_PATH.exists() else "🦎🦊"
-    )
+    mascot_html = '<img src="/logo.png" alt="AXFOX logo">' if LOGO_PATH.exists() else "🦎🦊"
 
     return f"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
 <title>AxolotlFox (AXFOX)</title>
 <style>
-  :root {{ --bg:#0b0f14; --panel:#131a22; --border:#22303c; --text:#e8eef4; --muted:#93a4b3; --accent:#7fd4ff; }}
+  :root {{ --bg:#0b0f14; --panel:#131a22; --border:#22303c; --text:#e8eef4; --muted:#93a4b3; --accent:#7fd4ff; --ok:#72e69b; --warn:#ffd166; --danger:#ff7b72; }}
   * {{ box-sizing:border-box; }}
   body {{ margin:0; background:var(--bg); color:var(--text); font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif; }}
   .wrap {{ max-width:760px; margin:0 auto; padding:32px 20px 80px; }}
@@ -84,10 +82,22 @@ def render() -> str:
   .row .v {{ color:var(--accent); text-align:right; word-break:break-all; }}
   .unavailable {{ color:var(--muted); }}
   code {{ background:#0d1319; padding:2px 6px; border-radius:4px; font-size:13px; }}
-  .copybtn {{ background:transparent; border:1px solid var(--border); color:var(--text); border-radius:6px; padding:2px 8px; cursor:pointer; font-size:12px; margin-left:8px; }}
+  button {{ background:#17232d; border:1px solid var(--border); color:var(--text); border-radius:8px; padding:9px 12px; cursor:pointer; font-weight:600; }}
+  button:hover {{ border-color:var(--accent); }}
+  .copybtn {{ background:transparent; padding:2px 8px; font-size:12px; margin-left:8px; }}
+  .actions {{ display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; }}
+  label {{ display:block; color:var(--muted); font-size:13px; margin:11px 0 5px; }}
+  input, textarea {{ width:100%; border:1px solid var(--border); border-radius:8px; background:#0d1319; color:var(--text); padding:10px 11px; font:14px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; }}
+  textarea {{ min-height:84px; resize:vertical; }}
+  pre {{ white-space:pre-wrap; word-break:break-all; background:#0d1319; border:1px solid var(--border); border-radius:8px; padding:10px; color:#b9c7d3; overflow:auto; }}
   ul {{ list-style:none; padding:0; margin:0; display:flex; gap:16px; flex-wrap:wrap; }}
   a {{ color:var(--accent); }}
   .risk {{ font-size:13px; color:var(--muted); border-left:3px solid #5a3a1a; padding:10px 14px; background:#1a140c; border-radius:0 8px 8px 0; }}
+  .wallet-note {{ font-size:13px; color:var(--muted); }}
+  .wallet-status {{ margin:10px 0; padding:9px 11px; border-radius:8px; background:#0d1319; border:1px solid var(--border); }}
+  .wallet-status.ok {{ color:var(--ok); border-color:#295e3d; }}
+  .wallet-status.warn {{ color:var(--warn); border-color:#705b1b; }}
+  .wallet-status.error {{ color:var(--danger); border-color:#6f2a2a; }}
   .mascot {{ font-size:48px; }}
   .mascot img {{ width:80px; height:80px; border-radius:16px; display:block; }}
 </style>
@@ -103,6 +113,37 @@ def render() -> str:
     <div class="row"><span>Network</span><span class="v">BNB Smart Chain</span></div>
     <div class="row"><span>Token contract</span><span class="v"><code>{esc(CONTRACT)}</code>
       <button class="copybtn" onclick="navigator.clipboard.writeText('{esc(CONTRACT)}')">copy</button></span></div>
+  </div>
+
+  <div class="panel">
+    <h2>Wallet / signing</h2>
+    <p class="wallet-note">Signing stays inside your wallet. AXFOX never asks for or stores a seed phrase or private key. Every transaction requires an explicit wallet approval.</p>
+    <div id="wallet-status" class="wallet-status">Wallet not connected.</div>
+    <div class="row"><span>Connected account</span><span id="wallet-account" class="v">not connected</span></div>
+    <div class="actions">
+      <button id="wallet-connect" type="button">Connect wallet</button>
+      <button id="wallet-switch" type="button">Switch to BNB Chain</button>
+      <button id="wallet-watch-asset" type="button">Add AXFOX to wallet</button>
+      <button id="wallet-sign-proof" type="button">Sign ownership proof</button>
+    </div>
+    <label>Latest message signature</label>
+    <pre id="signature-output">none</pre>
+
+    <h2 style="margin-top:20px">Human-reviewed transaction signer</h2>
+    <p class="wallet-note">This tool never fills a destination, amount, or calldata for you. Review all three. “Send” asks your wallet to sign and broadcast on BNB Smart Chain.</p>
+    <label for="tx-to">Destination contract/address</label>
+    <input id="tx-to" autocomplete="off" spellcheck="false" placeholder="0x…">
+    <label for="tx-value">BNB value</label>
+    <input id="tx-value" inputmode="decimal" autocomplete="off" placeholder="0">
+    <label for="tx-data">Transaction data / calldata</label>
+    <textarea id="tx-data" autocomplete="off" spellcheck="false" placeholder="0x"></textarea>
+    <div class="actions"><button id="tx-prepare" type="button">Prepare & preview</button></div>
+    <label>Exact transaction preview</label>
+    <pre id="tx-preview">nothing prepared</pre>
+    <label for="tx-confirm">After review, type SEND</label>
+    <input id="tx-confirm" autocomplete="off" spellcheck="false" placeholder="SEND">
+    <div class="actions"><button id="tx-send" type="button">Request wallet signature & broadcast</button></div>
+    <div class="row"><span>Transaction result</span><span id="tx-result" class="v">none</span></div>
   </div>
 
   <div class="panel">
@@ -124,10 +165,7 @@ def render() -> str:
 
   <div class="panel">
     <h2>Links</h2>
-    <ul>{social_rows}
-      <li><a href="{esc(SOCIAL['bscscan'])}" rel="noopener">BSCSCAN</a></li>
-      <li><a href="{esc(SOCIAL['fourmeme'])}" rel="noopener">FOUR.MEME</a></li>
-    </ul>
+    <ul>{social_rows}</ul>
   </div>
 
   <div class="panel">
@@ -138,63 +176,72 @@ def render() -> str:
     <div class="row"><span>Page rendered</span><span class="v">{esc(time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime()))}</span></div>
   </div>
 
-  <p class="risk">This is an early-stage, speculative meme token with no
-  guaranteed value or return. Nothing on this page is financial advice.
-  Verify the contract address yourself before doing anything. Data marked
-  UNAVAILABLE is genuinely unknown, not hidden.</p>
+  <p class="risk">AXFOX is an early-stage, speculative meme token with no guaranteed value or return. Nothing on this page is financial advice. Wallet signatures and transactions can have irreversible financial consequences. Verify the chain, destination, BNB amount, calldata and wallet prompt before approving. Data marked UNAVAILABLE is genuinely unknown, not hidden.</p>
 </div>
+<script src="/wallet.js" defer></script>
 </body>
 </html>"""
 
-
 class Handler(BaseHTTPRequestHandler):
+    def _send_file(self, path: Path, content_type: str) -> None:
+        if not path.exists():
+            self.send_response(404)
+            self.end_headers()
+            self.wfile.write(b"not configured")
+            return
+        data = path.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store" if path == WALLET_JS_PATH else "public, max-age=3600")
+        self.end_headers()
+        self.wfile.write(data)
+
     def do_GET(self):
-        if self.path not in ("/", "/index.html", "/health", "/logo.png"):
+        route = self.path.split("?", 1)[0]
+        if route not in ("/", "/index.html", "/health", "/logo.png", "/wallet.js"):
             self.send_response(404)
             self.end_headers()
             self.wfile.write(b"not found")
             return
-        if self.path == "/health":
+        if route == "/health":
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
             self.end_headers()
             self.wfile.write(b"ok")
             return
-        if self.path == "/logo.png":
-            if not LOGO_PATH.exists():
-                self.send_response(404)
-                self.end_headers()
-                self.wfile.write(b"logo not configured yet")
-                return
-            data = LOGO_PATH.read_bytes()
-            self.send_response(200)
-            self.send_header("Content-Type", "image/png")
-            self.send_header("Content-Length", str(len(data)))
-            self.end_headers()
-            self.wfile.write(data)
+        if route == "/logo.png":
+            self._send_file(LOGO_PATH, "image/png")
+            return
+        if route == "/wallet.js":
+            self._send_file(WALLET_JS_PATH, "application/javascript; charset=utf-8")
             return
         try:
             body = render().encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
+            self.send_header(
+                "Content-Security-Policy",
+                "default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https:; frame-ancestors 'self';",
+            )
+            self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
+            self.send_header("X-Content-Type-Options", "nosniff")
             self.end_headers()
             self.wfile.write(body)
-        except Exception as exc:  # noqa: BLE001 - never crash the server on a render error
+        except Exception as exc:
             self.send_response(500)
             self.send_header("Content-Type", "text/plain")
             self.end_headers()
             self.wfile.write(f"render error: {exc}".encode())
 
-    def log_message(self, fmt, *args):  # quieter default logging
+    def log_message(self, fmt, *args):
         sys.stderr.write("[axfox-web] " + (fmt % args) + "\n")
-
 
 def main() -> None:
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     print(f"AXFOX web dashboard listening on 127.0.0.1:{PORT}")
     server.serve_forever()
-
 
 if __name__ == "__main__":
     main()
