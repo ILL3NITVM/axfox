@@ -58,7 +58,11 @@ WantedBy=multi-user.target
 EOF
 
 sudo systemctl daemon-reload
-sudo systemctl enable --now "$SERVICE"
+sudo systemctl enable "$SERVICE"
+# restart (not enable --now, which is a no-op if already running) so unit
+# file changes — e.g. AXFOX_X_URL, the hardening options above — actually
+# take effect on every run of this script, not just the first.
+sudo systemctl restart "$SERVICE"
 sleep 1
 sudo systemctl --no-pager --full status "$SERVICE" | sed -n '1,18p'
 
